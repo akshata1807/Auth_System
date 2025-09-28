@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "Frontend/SRC/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "distDir": ".next"
+      }
+    }
+  ],
+  "probes": [
+    {
+      "path": "/",
+      "mustContain": "Auth System"
+    }
+  ]
+}
