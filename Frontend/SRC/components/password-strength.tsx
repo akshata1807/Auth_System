@@ -1,6 +1,6 @@
 'use client'
 
-import { validatePassword, getPasswordStrengthText, getPasswordStrengthColor } from '@/lib/password-validation'
+import { validatePassword, getPasswordStrengthText, getPasswordStrengthColor } from '../lib/password-validation'
 
 interface PasswordStrengthProps {
   password: string

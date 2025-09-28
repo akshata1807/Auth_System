@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import api from '@/lib/api'
-import PasswordStrength from '@/components/password-strength'
-import ThemeToggle from '@/components/theme-toggle'
+import api from '../../lib/api'
+import PasswordStrength from '../../components/password-strength'
+import ThemeToggle from '../../components/theme-toggle'
 
 export default function Signup() {
   const [formData, setFormData] = useState({
