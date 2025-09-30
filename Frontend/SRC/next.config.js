@@ -10,6 +10,18 @@ const nextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
+  serverExternalPackages: ['framer-motion'],
+  output: 'standalone',
+  generateBuildId: async () => {
+    return 'build-cache'
+  },
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+    };
+    return config;
+  },
 }
 
 module.exports = nextConfig

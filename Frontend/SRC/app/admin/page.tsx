@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import api from '../../lib/api'
-import ThemeToggle from '../../components/theme-toggle'
 
 interface User {
   id: string
@@ -123,7 +122,6 @@ export default function AdminDashboard() {
               </Link>
             </div>
             <div className="flex items-center space-x-4">
-              <ThemeToggle />
               <Link href="/welcome" className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
                 Home
               </Link>

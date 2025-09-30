@@ -6,7 +6,9 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import api from '../../lib/api'
 import PasswordStrength from '../../components/password-strength'
-import ThemeToggle from '../../components/theme-toggle'
+
+// Force dynamic rendering to avoid SSR issues
+export const dynamic = 'force-dynamic'
 
 export default function Signup() {
   const [formData, setFormData] = useState({
@@ -69,11 +71,6 @@ export default function Signup() {
   if (step === 2) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-        {/* Header with theme toggle */}
-        <div className="absolute top-4 right-4">
-          <ThemeToggle />
-        </div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -127,11 +124,6 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      {/* Header with theme toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

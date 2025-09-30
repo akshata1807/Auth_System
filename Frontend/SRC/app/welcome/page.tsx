@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import api from '../../lib/api'
-import ThemeToggle from '../../components/theme-toggle'
 
 interface User {
   id: string
@@ -35,11 +33,50 @@ export default function Welcome() {
       return
     }
 
-    // Decode token to get user info (simple way, in production use proper JWT decode)
+    // Decode token to get user info with proper error handling
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      setUser({ id: payload.id, name: payload.name || 'User', email: payload.email })
+      const parts = token.split('.')
+      if (parts.length !== 3) {
+        throw new Error('Invalid token format')
+      }
+
+      const payload = parts[1]
+      // Handle URL-safe base64 encoding
+      const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+      const paddedPayload = normalizedPayload + '='.repeat((4 - normalizedPayload.length % 4) % 4)
+
+      const decodedPayload = atob(paddedPayload)
+      const parsedPayload = JSON.parse(decodedPayload)
+
+      console.log('Decoded token payload:', parsedPayload) // Debug log
+
+      // Validate required fields - be more flexible
+      if (!parsedPayload) {
+        throw new Error('Token payload is empty')
+      }
+
+      // Use whatever ID field is available
+      const userId = parsedPayload.id || parsedPayload.userId || parsedPayload.sub || parsedPayload._id
+      const userEmail = parsedPayload.email || parsedPayload.emailAddress || parsedPayload.upn
+      const userName = parsedPayload.name || parsedPayload.displayName || parsedPayload.preferred_username || parsedPayload.given_name
+
+      if (!userId) {
+        console.error('Missing user ID in token:', { parsedPayload })
+        throw new Error('Invalid token payload - missing user ID')
+      }
+
+      if (!userEmail) {
+        console.error('Missing user email in token:', { parsedPayload })
+        throw new Error('Invalid token payload - missing user email')
+      }
+
+      setUser({
+        id: String(userId),
+        name: userName || userEmail?.split('@')[0] || 'User',
+        email: userEmail
+      })
     } catch (error) {
+      console.error('Token decoding failed:', error)
       localStorage.removeItem('token')
       router.push('/login')
     }
@@ -77,7 +114,6 @@ export default function Welcome() {
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Auth System</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <ThemeToggle />
               <Link href="/profile" className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
                 Profile
               </Link>
@@ -97,12 +133,7 @@ export default function Welcome() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center"
-          >
+          <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
               Welcome back, {user.name}!
             </h1>
@@ -124,7 +155,7 @@ export default function Welcome() {
                 </Link>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </main>
     </div>

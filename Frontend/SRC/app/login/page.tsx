@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import api from '../../lib/api'
-import ThemeToggle from '../../components/theme-toggle'
+
+// Force dynamic rendering to avoid SSR issues
+export const dynamic = 'force-dynamic'
+
+// Disable static optimization
+export const dynamicParams = true
+export const fetchCache = 'auto'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -13,6 +20,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+
+  // Handle OAuth errors from URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const error = urlParams.get('error')
+    if (error === 'oauth_failed') {
+      setError('OAuth login failed. Please try again or contact administrator.')
+    } else if (error === 'email_missing') {
+      setError('Account email information is missing. Please contact administrator.')
+    }
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -44,28 +62,20 @@ export default function Login() {
   }
 
   const handleGoogleLogin = () => {
-    // Direct redirect to Google OAuth - no error checking needed
+    // Clear any existing tokens before OAuth
+    localStorage.removeItem('token')
+    console.log('Starting Google OAuth flow...')
     window.location.href = 'http://localhost:5000/api/auth/google'
   }
 
   const handleFacebookLogin = () => {
-    // Direct redirect to Facebook OAuth - no error checking needed
+    // Direct redirect to Facebook OAuth - let the backend handle configuration errors
     window.location.href = 'http://localhost:5000/api/auth/facebook'
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      {/* Header with theme toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md"
-      >
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md">
         <h1 className="text-3xl font-bold text-center text-gray-800 dark:text-gray-200 mb-8">Login</h1>
 
         {error && (
@@ -159,13 +169,14 @@ export default function Login() {
           </Link>
         </div>
 
+
         <div className="mt-4 text-center">
           <span className="text-sm text-gray-600 dark:text-gray-400">Don't have an account? </span>
           <Link href="/signup" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500">
             Sign up
           </Link>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

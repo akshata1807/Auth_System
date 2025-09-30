@@ -120,7 +120,13 @@ router.post('/verify-otp', async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
+    const tokenPayload = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      iat: Math.floor(Date.now() / 1000)
+    };
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
 
     res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
   } catch (error) {
@@ -194,8 +200,15 @@ router.post('/login', async (req, res) => {
 
     // Set token expiration based on "Remember Me"
     const tokenExpiry = rememberMe ? '30d' : '7d';
+    const tokenPayload = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      iat: Math.floor(Date.now() / 1000)
+    };
     const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role },
+      tokenPayload,
       process.env.JWT_SECRET || 'secretkey',
       { expiresIn: tokenExpiry }
     );
@@ -307,6 +320,46 @@ router.post('/reset-password/:token', async (req, res) => {
   }
 });
 
+// Test OAuth configuration
+router.get('/test-oauth', (req, res) => {
+  const googleConfigured = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'your_google_client_id_here' &&
+                          process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CLIENT_SECRET !== 'your_google_client_secret_here'
+  const facebookConfigured = process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_ID !== 'your_facebook_app_id' &&
+                            process.env.FACEBOOK_APP_SECRET && process.env.FACEBOOK_APP_SECRET !== 'your_facebook_app_secret'
+
+  res.json({
+    googleConfigured,
+    facebookConfigured,
+    googleClientId: process.env.GOOGLE_CLIENT_ID ? 'configured' : 'missing',
+    facebookAppId: process.env.FACEBOOK_APP_ID ? 'configured' : 'missing',
+    message: 'OAuth configuration status checked'
+  })
+})
+
+// Create test user for OAuth testing
+router.post('/create-test-user', async (req, res) => {
+  try {
+    const testUser = new User({
+      name: 'Test OAuth User',
+      email: 'oauth-test@example.com',
+      password: 'testpassword123',
+      isVerified: true
+    })
+
+    await testUser.save()
+    res.json({
+      message: 'Test user created',
+      user: {
+        id: testUser._id,
+        name: testUser.name,
+        email: testUser.email
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
 // Google OAuth
 router.get('/google', (req, res, next) => {
   if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'your_google_client_id_here' ||
@@ -341,10 +394,44 @@ router.get('/google/callback', (req, res, next) => {
       }
     });
   }
-  passport.authenticate('google', { failureRedirect: '/login' })(req, res, next);
-}, (req, res) => {
-  const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
-  res.redirect(`http://localhost:3000/welcome?token=${token}`);
+  passport.authenticate('google', { failureRedirect: 'http://localhost:3000/login' })(req, res, next);
+}, async (req, res) => {
+  try {
+    console.log('OAuth callback successful for user:', req.user.email);
+    console.log('User object:', JSON.stringify(req.user, null, 2));
+
+    // Ensure user has required fields
+    let user = req.user;
+    if (!user.name || !user.email) {
+      // Reload user from database to get complete data
+      user = await User.findById(req.user._id);
+      console.log('Reloaded user object:', JSON.stringify(user, null, 2));
+    }
+
+    // Final fallback - ensure we have the required fields
+    const finalName = user.name || user.displayName || 'OAuth User';
+    const finalEmail = user.email;
+
+    if (!finalEmail) {
+      console.error('User email is still missing after reload:', user);
+      return res.redirect('http://localhost:3000/login?error=email_missing');
+    }
+
+    const tokenPayload = {
+      id: user._id.toString(),
+      name: finalName,
+      email: finalEmail,
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    console.log('Token payload:', tokenPayload);
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
+    console.log('Generated token for OAuth user, redirecting to welcome page');
+    res.redirect(`http://localhost:3000/welcome?token=${token}`);
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect('http://localhost:3000/login?error=oauth_failed');
+  }
 });
 
 // Facebook OAuth
@@ -381,10 +468,44 @@ router.get('/facebook/callback', (req, res, next) => {
       }
     });
   }
-  passport.authenticate('facebook', { failureRedirect: '/login' })(req, res, next);
-}, (req, res) => {
-  const token = jwt.sign({ id: req.user._id, name: req.user.name, email: req.user.email }, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
-  res.redirect(`http://localhost:3000/welcome?token=${token}`);
+  passport.authenticate('facebook', { failureRedirect: 'http://localhost:3000/login' })(req, res, next);
+}, async (req, res) => {
+  try {
+    console.log('Facebook OAuth callback successful for user:', req.user.email);
+    console.log('Facebook User object:', JSON.stringify(req.user, null, 2));
+
+    // Ensure user has required fields
+    let user = req.user;
+    if (!user.name || !user.email) {
+      // Reload user from database to get complete data
+      user = await User.findById(req.user._id);
+      console.log('Reloaded Facebook user object:', JSON.stringify(user, null, 2));
+    }
+
+    // Final fallback - ensure we have the required fields
+    const finalName = user.name || user.displayName || 'Facebook User';
+    const finalEmail = user.email;
+
+    if (!finalEmail) {
+      console.error('Facebook user email is still missing after reload:', user);
+      return res.redirect('http://localhost:3000/login?error=email_missing');
+    }
+
+    const tokenPayload = {
+      id: user._id.toString(),
+      name: finalName,
+      email: finalEmail,
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    console.log('Facebook Token payload:', tokenPayload);
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'secretkey', { expiresIn: '7d' });
+    console.log('Generated Facebook token, redirecting to welcome page');
+    res.redirect(`http://localhost:3000/welcome?token=${token}`);
+  } catch (error) {
+    console.error('Facebook OAuth callback error:', error);
+    res.redirect('http://localhost:3000/login?error=oauth_failed');
+  }
 });
 
 // Logout

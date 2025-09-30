@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 type Theme = 'light' | 'dark'
 
@@ -11,30 +11,33 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+// Default theme value for SSR
+const defaultTheme: Theme = 'light'
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(defaultTheme)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Check for saved theme preference or default to light mode
-    const savedTheme = localStorage.getItem('theme') as Theme
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-
-    const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light')
-    setTheme(initialTheme)
     setMounted(true)
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      // Check for saved theme preference or default to light mode
+      const savedTheme = localStorage.getItem('theme') as Theme
+      if (savedTheme) {
+        setTheme(savedTheme)
+      } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        setTheme(prefersDark ? 'dark' : 'light')
+      }
+    }
   }, [])
 
   useEffect(() => {
-    if (mounted) {
+    if (mounted && typeof window !== 'undefined') {
       const root = window.document.documentElement
-
-      if (theme === 'dark') {
-        root.classList.add('dark')
-      } else {
-        root.classList.remove('dark')
-      }
-
+      root.classList.remove('light', 'dark')
+      root.classList.add(theme)
       localStorage.setItem('theme', theme)
     }
   }, [theme, mounted])
@@ -43,9 +46,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
-  // Prevent hydration mismatch
+  // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
-    return <>{children}</>
+    return (
+      <ThemeContext.Provider value={{ theme: defaultTheme, toggleTheme }}>
+        {children}
+      </ThemeContext.Provider>
+    )
   }
 
   return (
@@ -57,7 +64,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme() {
   const context = useContext(ThemeContext)
-  if (context === undefined) {
+  if (context === undefined || context === null) {
     throw new Error('useTheme must be used within a ThemeProvider')
   }
   return context
